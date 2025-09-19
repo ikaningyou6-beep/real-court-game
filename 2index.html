@@ -1,0 +1,533 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>リアル逆転裁判 — 三審制（スマホ対応）</title>
+
+<!-- Google Font: Noto Sans JP (html2pdf will rasterize DOM so font renders in PDF) -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --bg:#f6f8fb; --card:#fff; --accent:#1a73e8; --muted:#6b7280;
+  }
+  html,body{height:100%;margin:0;font-family:"Noto Sans JP",system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:var(--bg);color:#071029}
+  .container{max-width:820px;margin:8px auto;padding:10px}
+  header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  h1{font-size:18px;margin:0;color:var(--accent)}
+  .flex{display:flex;gap:8px}
+  .card{background:var(--card);border-radius:12px;padding:12px;margin-top:10px;box-shadow:0 6px 18px rgba(13,18,25,0.04)}
+  label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+  textarea, input, select {width:100%;padding:10px;border-radius:8px;border:1px solid #e6eef6;font-size:15px;box-sizing:border-box}
+  button{width:100%;padding:12px;border-radius:10px;border:0;background:var(--accent);color:#fff;font-size:16px;cursor:pointer}
+  .btn-ghost{background:#fff;color:var(--accent);border:1px solid #dbe9ff}
+  .row{display:flex;gap:8px}
+  .row > *{flex:1}
+  #log{min-height:160px;max-height:320px;overflow:auto;padding:10px;border-radius:8px;border:1px solid #eef6ff;background:#fcfeff;white-space:pre-wrap}
+  .small{font-size:13px;color:var(--muted)}
+  .stage-indicator{font-weight:700;color:#0f1724;margin-top:6px}
+  .prediction-buttons button{width:48%}
+  footer{margin-top:10px;text-align:center;color:var(--muted);font-size:13px}
+  @media (prefers-color-scheme: dark){
+    :root{--bg:#0b1220;--card:#071028;--accent:#4ea1ff;--muted:#8b98a9}
+    textarea,input,select{background:#0b1220;color:#e6eef6;border-color:#123}
+    #log{background:#071028;color:#dbe9ff;border-color:#123}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>リアル逆転裁判（スマホ対応）</h1>
+    <div class="small">三審制・PDF出力・発言ログを保存</div>
+  </header>
+
+  <!-- Case editor -->
+  <section class="card" aria-labelledby="case">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div style="flex:1">
+        <label>事件概要（手動入力またはランダム生成）</label>
+        <textarea id="caseInput" rows="3" placeholder="例：夜間横断中の歩行者が自転車と衝突し負傷。原告は損害賠償100万円を請求。"></textarea>
+      </div>
+      <div style="width:110px">
+        <label>&nbsp;</label>
+        <button id="randCaseBtn" class="btn-ghost">🎲 ランダム</button>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+      <button id="startBtn">⚖️ 裁判開始（第一審）</button>
+      <button id="autoFullBtn" class="btn-ghost">⚙️ 三審を自動進行</button>
+    </div>
+
+    <div class="small" style="margin-top:8px">現在の審級: <span id="stageLabel">未開始</span></div>
+  </section>
+
+  <!-- Controls -->
+  <section class="card">
+    <div class="row">
+      <div>
+        <label>プレイヤーの予想（この審級）</label>
+        <div class="prediction-buttons" style="display:flex;gap:6px">
+          <button id="predPla">原告勝訴</button>
+          <button id="predDef" class="btn-ghost">被告勝訴</button>
+        </div>
+      </div>
+      <div>
+        <label>アクション</label>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <button id="objBtn" class="btn-ghost">🙋 異議あり（入力）</button>
+          <button id="commentBtn" class="btn-ghost">📝 自由意見を入力</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label>プレイヤーログ（時系列）</label>
+      <div id="playerLog" style="min-height:80px;padding:8px;border-radius:8px;border:1px solid #eef6ff;background:#fbfdff"></div>
+    </div>
+  </section>
+
+  <!-- Trial cards -->
+  <section class="card">
+    <div class="small">審級表示（タップで切替）</div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button id="show1" class="btn-ghost">第一審</button>
+      <button id="show2" class="btn-ghost">控訴審</button>
+      <button id="show3" class="btn-ghost">上告審</button>
+    </div>
+
+    <div id="trialArea" style="margin-top:12px">
+      <!-- dynamic content inserted here -->
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button id="nextStageBtn">➡️ 次の審級へ進む</button>
+      <button id="exportBtn" class="btn-ghost">📄 判決PDFを出力</button>
+    </div>
+  </section>
+
+  <!-- Log -->
+  <section class="card">
+    <div class="small">裁判ログ（進行／裁判所メモ）</div>
+    <div id="log"></div>
+  </section>
+
+  <footer>注：このシステムは教育・ゲーム目的のシミュレーションです。生成される文書は法的助言ではありません。</footer>
+</div>
+
+<!-- html2pdf (includes html2canvas + jsPDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<script>
+/* ============================
+   Trial system (Client-side)
+   ============================ */
+
+const state = {
+  case: null,             // {id,title,summary,type,laws,precs,evidence}
+  stage: 0,               // 0=not started, 1=first,2=appeal,3=final
+  records: {},            // per-stage array of records
+  verdicts: {},           // per-stage verdict {winner,headline,fullText}
+  player: {               // player data
+    predictions: {},      // stage -> 'plaintiff'|'defendant'
+    actions: [],          // [{stage, type:'objection'|'comment', text, time}]
+    score: 0
+  },
+  autoRunning: false
+};
+
+/* ---------- utilities ---------- */
+function $(id){return document.getElementById(id);}
+function now(){return new Date().toLocaleString();}
+function randName(){ const fn=['佐藤','鈴木','高橋','田中','渡辺']; const gn=['太郎','花子','一郎','彩']; return fn[Math.floor(Math.random()*fn.length)] + ' ' + gn[Math.floor(Math.random()*gn.length)]; }
+function randCourt(){ const c=['東京地方裁判所','大阪地方裁判所','名古屋地方裁判所']; return c[Math.floor(Math.random()*c.length)]; }
+function log(msg, cls='') {
+  const el = $('log');
+  const entry = document.createElement('div');
+  entry.style.marginBottom='8px';
+  entry.innerHTML = `<div style="font-size:12px;color:#94a3b8">${now()}</div><div>${msg}</div>`;
+  el.prepend(entry);
+}
+
+/* ---------- UI wiring ---------- */
+$('randCaseBtn').addEventListener('click', ()=> {
+  const templates = [
+    {type:'civil', title:'路上自転車衝突事件', summary:'夜間に横断中の歩行者が自転車と衝突し負傷。原告は損害賠償100万円を請求。被告は夜間視認困難および原告過失を主張。'},
+    {type:'criminal', title:'飲酒運転致傷事件', summary:'被告が飲酒運転により歩行者を轢き重傷を負わせた。検察は危険運転致傷を主張。被告は飲酒量を争う。'},
+    {type:'administrative', title:'建築確認取消訴訟', summary:'行政庁が建築確認を取り消した処分について、申請者が取消訴訟を提起。手続適正と裁量の範囲が争点。'}
+  ];
+  const pick = templates[Math.floor(Math.random()*templates.length)];
+  $('caseInput').value = `${pick.title} — ${pick.summary}`;
+});
+
+/* Predictions */
+$('predPla').addEventListener('click', ()=> makePrediction('plaintiff'));
+$('predDef').addEventListener('click', ()=> makePrediction('defendant'));
+
+function makePrediction(who){
+  if(state.stage===0){ alert('まずは裁判開始（第一審）してください'); return; }
+  state.player.predictions[state.stage] = who;
+  updatePlayerLog();
+  log(`<strong>プレイヤー予想（第${state.stage}審）:</strong> ${who==='plaintiff' ? '原告勝訴' : '被告勝訴'}`);
+}
+
+/* Actions */
+$('objBtn').addEventListener('click', ()=> {
+  if(state.stage===0){ alert('審理未開始です'); return; }
+  const text = prompt('異議の理由を入力してください（そのままPDFに記録されます）');
+  if(text){
+    state.player.actions.push({stage:state.stage,type:'objection',text,time:new Date().toISOString()});
+    updatePlayerLog();
+    log(`<strong>プレイヤー異議（第${state.stage}審）:</strong> ${text}`);
+  }
+});
+$('commentBtn').addEventListener('click', ()=> {
+  if(state.stage===0){ alert('審理未開始です'); return; }
+  const txt = prompt('自由意見を入力してください（そのままPDFに記録されます）');
+  if(txt){
+    state.player.actions.push({stage:state.stage,type:'comment',text:txt,time:new Date().toISOString()});
+    updatePlayerLog();
+    log(`<strong>プレイヤー意見（第${state.stage}審）:</strong> ${txt}`);
+  }
+});
+
+/* Start trial (first stage) */
+$('startBtn').addEventListener('click', ()=> {
+  if(!$('caseInput').value.trim()){ alert('事件概要を入力してください'); return; }
+  startTrial();
+});
+
+/* Auto full (three-stage) */
+$('autoFullBtn').addEventListener('click', async ()=> {
+  if(state.autoRunning){ state.autoRunning=false; $('autoFullBtn').innerText='⚙️ 三審を自動進行'; return; }
+  if(!state.case) startTrial();
+  state.autoRunning = true; $('autoFullBtn').innerText='⛔ 自動停止';
+  for(let s=state.stage; s<=3; s++){
+    if(!state.autoRunning) break;
+    if(state.stage !== s) setStage(s);
+    await runStageAuto(s);
+    // short pause
+    await new Promise(r=>setTimeout(r,700));
+  }
+  state.autoRunning=false; $('autoFullBtn').innerText='⚙️ 三審を自動進行';
+});
+
+/* Show stage buttons */
+$('show1').addEventListener('click', ()=> renderTrialArea(1));
+$('show2').addEventListener('click', ()=> renderTrialArea(2));
+$('show3').addEventListener('click', ()=> renderTrialArea(3));
+
+/* Next stage */
+$('nextStageBtn').addEventListener('click', ()=> {
+  if(state.stage===0){ alert('まず裁判を開始してください'); return; }
+  if(state.stage < 3){ setStage(state.stage+1); runStageAuto(state.stage); }
+  else alert('既に最終審級です');
+});
+
+/* Export PDF */
+$('exportBtn').addEventListener('click', exportAllVerdictsPDF);
+
+/* ---------- core functions ---------- */
+
+function startTrial(){
+  state.case = {
+    id: 'CASE' + Date.now().toString(36).slice(-6),
+    title: $('caseInput').value.split('—')[0]?.trim() || '（事件）',
+    summary: $('caseInput').value.trim(),
+    court: randCourt(),
+    judge: randName()
+  };
+  state.stage = 1;
+  state.records = {1:[],2:[],3:[]};
+  state.verdicts = {};
+  state.player.predictions = {};
+  state.player.actions = [];
+  state.player.score = 0;
+  log(`<strong>事件登録:</strong> ${state.case.title}`);
+  setStage(1);
+  runStageAuto(1);
+  renderTrialArea(1);
+  updatePlayerLog();
+}
+
+/* set UI stage label */
+function setStage(n){
+  state.stage = n;
+  $('stageLabel').innerText = (n===1?'第一審（地方裁判所）':n===2?'控訴審（高等裁判所）':'上告審（最高裁判所）');
+}
+
+/* simulate stage automatically (CPU pseudo-AI) */
+async function runStageAuto(stageNo){
+  log(`=== 第${stageNo}審の審理を開始します ===`);
+  const steps = [
+    '訴状・起訴の呈示',
+    '答弁書・弁論準備',
+    '証拠開示・証拠調べ',
+    '証人尋問（任意）',
+    '最終弁論',
+    '評議'
+  ];
+  for(let i=0;i<steps.length;i++){
+    // small simulated delay
+    await new Promise(r=>setTimeout(r, Math.max(200, 800 - (i*60))));
+    // CPU generates arguments for the step
+    const outputs = cpuGenerateArguments(stageNo, steps[i]);
+    state.records[stageNo].push({step:steps[i],outputs,time:new Date().toISOString()});
+    log(`<strong>手続:</strong> ${steps[i]}<br/><em>原告：</em>${outputs.plaintiff}<br/><em>被告：</em>${outputs.defendant}<br/><em>裁判所メモ：</em>${outputs.judgeNotes}`);
+  }
+  // generate judgment for this stage
+  const verdict = cpuJudgeDecision(stageNo);
+  state.verdicts[stageNo] = verdict;
+  log(`<strong>判決（第${stageNo}審）:</strong> ${verdict.headline}`);
+  // evaluate player's prediction if any
+  if(state.player.predictions[stageNo]){
+    const pred = state.player.predictions[stageNo];
+    const hit = (pred === verdict.winner);
+    if(hit){ state.player.score += 1; log(`<strong>予想的中（第${stageNo}審）！</strong>`); } 
+    else { log(`<strong>予想は外れ（第${stageNo}審）</strong>`); }
+  } else {
+    log(`（第${stageNo}審に対するプレイヤー予想は登録されていません）`);
+  }
+  renderTrialArea(stageNo);
+  updatePlayerLog();
+}
+
+/* CPU pseudo-AI for arguments */
+function cpuGenerateArguments(stage, stepName){
+  const base = state.case.summary || '';
+  const plaintiff = (stage===1) ? `原告は${base}と主張し、損害賠償を求める。` :
+                    (stage===2) ? `被控訴人は第一審の事実認定に争いがあると主張する。新たに証拠を提出。` :
+                                  `上告は法律判断に限定して争点を争う。法的争点を中心に主張。`;
+  const defendant = (stage===1) ? `被告は過失を否認し、過失相殺や因果関係を争う。` :
+                     (stage===2) ? `控訴人は第一審の証拠評価を争い、証拠の信用性を攻撃する。` :
+                                   `上告人は法解釈の誤りを主張する（公法上の問題）。`;
+  const judgeNotes = `争点例：過失の有無、損害額、証拠の信用性。階級：第${stage}審。ステップ：${stepName}`;
+  return {plaintiff, defendant, judgeNotes};
+}
+
+/* CPU decision: naive but "実務寄せ"テンプレで出力 */
+function cpuJudgeDecision(stage){
+  // simplistic scoring based on random + stage modifiers
+  const rand = Math.random();
+  let winner = rand > 0.45 ? 'defendant' : 'plaintiff';
+  // stage bias: higher stages more likely to reverse? small chance
+  if(stage===2 && Math.random() < 0.25) winner = (winner==='plaintiff'?'defendant':'plaintiff');
+  if(stage===3 && Math.random() < 0.15) winner = (winner==='plaintiff'?'defendant':'plaintiff');
+
+  let headline = '';
+  let fullText = '';
+  if(state.case){ 
+    const court = stage===1 ? state.case.court : stage===2 ? '高等'+state.case.court : '最高裁判所';
+    const judge = randName();
+    if(state.case.title) {
+      // build a formal-looking judgment (short)
+      if(state.case.type === 'criminal'){
+        headline = winner==='plaintiff'? '被告人を有罪とする' : '被告人を無罪とする';
+      } else {
+        headline = winner==='plaintiff'? '原告の請求を一部認容する' : '原告の請求を棄却する';
+      }
+      // compose a fuller fullText
+      fullText = `令和${new Date().getFullYear()}年（仮）第${Math.floor(100+Math.random()*900)}号\n　原告　${randName()}\n　被告　${randName()}\n\n　${court}\n\n　　　　　　　　　判　　決\n\n主文\n`;
+      if(winner==='plaintiff'){
+        if(state.case.type==='criminal') fullText += `被告人を懲役${1+Math.floor(Math.random()*4)}年に処する。`;
+        else fullText += `被告は原告に対し金${(50000 + Math.floor(Math.random()*450000)).toLocaleString()}円を支払え。訴訟費用は被告の負担とする。`;
+      } else {
+        if(state.case.type==='criminal') fullText += `被告人を無罪とする。`;
+        else fullText += `原告の請求を棄却する。`;
+      }
+      fullText += `\n\n理由\n第１　事案の概要\n　${state.case.summary}\n\n第２　当事者の主張\n１　原告（又は検察）\n　（要旨）…\n２　被告\n　（要旨）…\n\n第３　当裁判所の判断\n１　争点（主要な争点）について\n　（証拠及び判断）…\n\nよって、主文のとおり判決する。\n\n令和${new Date().getFullYear()}年${new Date().getMonth()+1}月${new Date().getDate()}日\n　${court}\n　裁判官　${judge}`;
+    } else {
+      headline = '判決（仮）';
+      fullText = '（判決本文）';
+    }
+  } else {
+    headline = '判決（仮）';
+    fullText = '（事件情報がありません）';
+  }
+
+  return {winner, headline, fullText};
+}
+
+/* render the trial area for a given stage (display last record and verdict) */
+function renderTrialArea(stageNo){
+  const area = $('trialArea');
+  area.innerHTML = '';
+  const card = document.createElement('div');
+  card.style.padding='8px';
+  card.style.borderRadius='8px';
+  card.style.background='#fff';
+  card.style.border='1px solid #eef6ff';
+  const title = document.createElement('div');
+  title.innerHTML = `<div class="stage-indicator">第${stageNo}審：${stageNo===1?'第一審（地裁）':stageNo===2?'控訴審（高裁）':'上告審（最高裁）'}</div>`;
+  card.appendChild(title);
+
+  // records
+  const recs = state.records[stageNo] || [];
+  const last = recs[recs.length-1];
+  const recDiv = document.createElement('div');
+  recDiv.style.marginTop='8px';
+  recDiv.innerHTML = last ? `<div class="small">直近手続: ${last.step}</div>
+    <div><strong>原告主張</strong><div class="small">${last.outputs.plaintiff}</div></div>
+    <div><strong>被告主張</strong><div class="small">${last.outputs.defendant}</div></div>
+    <div><strong>裁判所メモ</strong><div class="small">${last.outputs.judgeNotes}</div></div>` : '<div class="small">まだ手続は進んでいません。</div>';
+  card.appendChild(recDiv);
+
+  // verdict
+  const v = state.verdicts[stageNo];
+  const verdictDiv = document.createElement('div');
+  verdictDiv.style.marginTop='10px';
+  verdictDiv.innerHTML = v ? `<div><strong>判決:</strong> ${v.headline}</div>` : '<div class="small">判決は未確定です</div>';
+  card.appendChild(verdictDiv);
+
+  // player prediction status
+  const pred = state.player.predictions[stageNo];
+  const predDiv = document.createElement('div');
+  predDiv.style.marginTop='10px';
+  predDiv.innerHTML = `<div class="small">あなたのこの審級の予想: ${pred ? (pred==='plaintiff'?'原告勝訴':'被告勝訴') : '未登録'}</div>`;
+  card.appendChild(predDiv);
+
+  area.appendChild(card);
+}
+
+/* update player log area */
+function updatePlayerLog(){
+  const el = $('playerLog');
+  el.innerHTML = '';
+  const lines = [];
+  // actions grouped by stage
+  (state.player.actions||[]).forEach((act,i)=> {
+    const prefix = act.type==='objection' ? '異議あり' : '意見';
+    lines.push(`第${act.stage}審 [${prefix}] ${act.text}`);
+  });
+  // predictions
+  for(let s=1;s<=3;s++){
+    if(state.player.predictions[s]) lines.push(`第${s}審 予想: ${state.player.predictions[s]==='plaintiff'?'原告勝訴':'被告勝訴'}`);
+  }
+  el.innerText = lines.join('\n') || '(記録なし)';
+}
+
+/* ---------- PDF generation (html2pdf) ---------- */
+function exportAllVerdictsPDF(){
+  if(!state.case){ alert('未だ事件がありません'); return; }
+
+  // construct printable DOM element
+  const wrapper = document.createElement('div');
+  wrapper.style.padding='18px';
+  wrapper.style.fontFamily='"Noto Sans JP", sans-serif';
+  wrapper.style.color='#111';
+  wrapper.style.background='#fff';
+  wrapper.style.width='780px'; // for decent layout when rasterized
+  wrapper.style.boxSizing='border-box';
+
+  // header
+  const header = document.createElement('div');
+  header.innerHTML = `<div style="text-align:right;font-size:12px">作成: ${now()}</div>
+    <h2 style="text-align:center;margin:6px 0 12px 0">判決書（学習用シミュレーション）</h2>`;
+  wrapper.appendChild(header);
+
+  // case info
+  const caseInfo = document.createElement('div');
+  caseInfo.style.marginBottom='8px';
+  caseInfo.innerHTML = `<div><strong>事件ID:</strong> ${state.case.id || ''}</div>
+    <div><strong>事件名 / 要旨:</strong> ${state.case.title} — ${state.case.summary}</div>
+    <div><strong>裁判所（第一審名）：</strong> ${state.case.court}</div>`;
+  wrapper.appendChild(caseInfo);
+
+  // each stage fullText
+  for(let s=1;s<=3;s++){
+    const v = state.verdicts[s];
+    const stageTitle = s===1 ? '第一審（地方裁判所）' : s===2 ? '控訴審（高等裁判所）' : '上告審（最高裁判所）';
+    const container = document.createElement('div');
+    container.style.marginTop='12px';
+    container.innerHTML = `<h3 style="margin-bottom:6px">${stageTitle}</h3>`;
+    if(v){
+      // put full text (preserve newlines)
+      const pre = document.createElement('pre');
+      pre.style.whiteSpace='pre-wrap';
+      pre.style.fontFamily='"Noto Sans JP", sans-serif';
+      pre.style.fontSize='12px';
+      pre.style.lineHeight='1.5';
+      pre.style.background='transparent';
+      pre.textContent = v.fullText;
+      container.appendChild(pre);
+    } else {
+      container.innerHTML += `<div class="small">（判決未生成）</div>`;
+    }
+    // player's prediction for this stage
+    const pred = state.player.predictions[s];
+    container.innerHTML += `<div style="margin-top:6px"><strong>あなたの予想:</strong> ${pred? (pred==='plaintiff'?'原告勝訴':'被告勝訴') : '未登録'}</div>`;
+    // player's actions filtered by stage
+    const acts = (state.player.actions||[]).filter(a=>a.stage===s);
+    if(acts.length){
+      const actsDiv = document.createElement('div');
+      actsDiv.style.marginTop='6px';
+      actsDiv.innerHTML = '<strong>プレイヤー記録（この審級）:</strong>';
+      const ul = document.createElement('ul');
+      acts.forEach(a=> {
+        const li = document.createElement('li');
+        li.textContent = `[${a.type==='objection'?'異議':'意見'}] ${a.text} (${new Date(a.time).toLocaleString()})`;
+        ul.appendChild(li);
+      });
+      actsDiv.appendChild(ul);
+      container.appendChild(actsDiv);
+    }
+    wrapper.appendChild(container);
+  }
+
+  // overall game result
+  const summary = document.createElement('div');
+  summary.style.marginTop='14px';
+  const totalPreds = Object.keys(state.player.predictions).length;
+  const hits = state.player.score;
+  const percent = totalPreds? Math.round((hits/totalPreds)*100) : 0;
+  summary.innerHTML = `<h3>【ゲーム結果】</h3>
+    <div>・予想登録数: ${totalPreds}</div>
+    <div>・的中数: ${hits}</div>
+    <div>・的中率: ${percent}%</div>`;
+  wrapper.appendChild(summary);
+
+  // all player actions (full, raw)
+  const allActs = document.createElement('div');
+  allActs.style.marginTop='12px';
+  allActs.innerHTML = `<h3>【プレイヤー全発言ログ（時系列）】</h3>`;
+  if(state.player.actions.length){
+    const pre2 = document.createElement('pre');
+    pre2.style.whiteSpace='pre-wrap';
+    pre2.style.fontFamily='"Noto Sans JP", sans-serif';
+    pre2.style.fontSize='12px';
+    pre2.textContent = state.player.actions.map((a,i)=>`${i+1}. 第${a.stage}審 [${a.type}] ${a.text} (${new Date(a.time).toLocaleString()})`).join('\\n');
+    allActs.appendChild(pre2);
+  } else allActs.innerHTML += '<div class="small">（記録なし）</div>';
+  wrapper.appendChild(allActs);
+
+  // generate PDF via html2pdf
+  const opt = {
+    margin: 12,
+    filename: `判決文_${(new Date()).toISOString().slice(0,10)}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'pt', format: 'a4', orientation: 'portrait' }
+  };
+  // show quick feedback
+  log('PDF生成中…（少し時間がかかることがあります）');
+  html2pdf().set(opt).from(wrapper).save().then(()=> {
+    log('PDFを出力しました');
+  }).catch(err=>{
+    console.error(err);
+    alert('PDF生成中にエラーが発生しました（コンソール参照）');
+  });
+}
+
+/* ---------- initial state / helpers ---------- */
+(function init(){
+  // default example
+  $('caseInput').value = '路上自転車衝突事件 — 夜間横断中の歩行者が自転車と衝突し負傷。原告は損害賠償100万円を請求。';
+  renderTrialArea(1);
+  setStage(0);
+  updatePlayerLog();
+})();
+</script>
+</body>
+</html>
