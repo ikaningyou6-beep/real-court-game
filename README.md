@@ -1,2 +1,2 @@
-# real-court-game
+# リアル逆転裁判
 1
