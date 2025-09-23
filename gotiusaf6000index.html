@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ゴチうさファイナンス — 統合高度版</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap">
+<style>
+:root{--bg:#f7fafc;--card:#fff;--muted:#64748b;--accent:#0ea5a4;--danger:#dc2626;--good:#2563eb;--warning:#f59e0b}
+*{box-sizing:border-box}
+body{font-family:Inter,system-ui,Arial,sans-serif;margin:12px;background:#f1f5f9;color:#0f172a}
+h2{margin:0 0 8px 0; font-size: 1.5rem; font-weight: 600; color: #1e293b;}
+h3{font-size: 1.25rem; font-weight: 600; color: #1e293b;}
+.grid{display:grid;grid-template-columns:1fr 420px;gap:12px}
+.left-column,.right-column{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--card);padding:12px;border-radius:8px;box-shadow:0 4px 12px rgba(2,6,23,0.06)}
+h4{margin:0 0 6px 0;color:#1e293b}
+button,select,input{padding:8px 12px;border-radius:8px;border:1px solid #cbd5e1;background:white;cursor:pointer;font-weight:600}
+.btn{background:var(--accent);color:#fff;border:0}
+.btn:hover:not(:disabled) { background-color: #14b8a6; }
+.btn.warn{background:var(--danger)} 
+.btn.warn:hover:not(:disabled) { background-color: #ef4444; }
+.btn.warning{background:var(--warning)}
+.btn.warning:hover:not(:disabled) { background-color: #f97316; }
+button:disabled{background:#e2e8f0;cursor:not-allowed;color:#94a3b8}
+.btn-group{display:flex;gap:8px;flex-wrap:wrap}
+.panel-grid{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.small-muted{font-size:12px;color:#6b7280}
+textarea{width:100%;flex-grow:1;min-height:280px;padding:8px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;font-family:monospace;font-size:12px;resize:vertical}
+.profile{display:flex;gap:12px}
+#sprite{width:140px;height:210px;object-fit:cover;border-radius:8px;background:#e2e8f0;border:1px solid #cbd5e1}
+#notification-area{position:fixed;top:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:10px}
+.notification{padding:12px;border-radius:8px;color:#fff;font-weight:600;opacity:0;transform:translateX(100%);animation:slideIn .45s forwards,fadeOut .45s 4.5s forwards}
+.notification.info{background:var(--good)} .notification.warning{background:var(--warning)} .notification.danger{background:var(--danger)}
+@keyframes slideIn{to{opacity:1;transform:translateX(0)}} @keyframes fadeOut{to{opacity:0;transform:translateX(100%)}}
+.scrollable{height:150px;overflow:auto;font-size:13px}
+.progress-bar{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--accent);transition:width .3s ease}
+.mini-input{width:80px;padding:4px 6px;font-size:12px}
+#victory-screen,#defeat-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(15,23,42,0.8);color:white;display:none;align-items:center;justify-content:center;text-align:center;z-index:2000}
+.modal-content{background:#1e293b;padding:40px;border-radius:12px;box-shadow:0 10px 25px rgba(0,0,0,0.5)}
+#achievements-panel ul{list-style:none;padding:0;text-align:left}
+#achievements-panel li{margin-bottom:8px;opacity:0.5}
+#achievements-panel li.unlocked{opacity:1;font-weight:bold;color:#14b8a6}
+#creditor-panel select{width:100%;margin-bottom:8px}
+#diffusionCanvas{width:100% !important;height:220px !important;background:transparent;border-radius:6px;border:1px solid #cbd5e1}
+.row-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.select{background:#fff;color:#0f172a;border:1px solid #cbd5e1;border-radius:8px;padding:6px}
+.btn-ghost{background:#fff;border:1px solid #cbd5e1;color:#0f172a}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+</style>
+</head>
+<body>
+<div id="notification-area"></div>
+
+<div id="victory-screen">
+  <div class="modal-content">
+    <h1 class="text-3xl font-bold">勝利！</h1>
+    <p id="victory-reason" class="my-4"></p>
+    <button class="btn" onclick="restartGame()">もう一度プレイ</button>
+  </div>
+</div>
+<div id="defeat-screen">
+  <div class="modal-content">
+    <h1 class="text-3xl font-bold">敗北...</h1>
+    <p id="defeat-reason" class="my-4"></p>
+    <button class="btn" onclick="restartGame()">再挑戦</button>
+  </div>
+</div>
+
+<header><h2 class="text-2xl font-bold">ゴチうさファイナンス — 統合高度版</h2></header>
+
+<div class="grid mt-4">
+  <div class="left-column">
+    <div class="panel" id="charSelect"><h4>政務官を選択</h4><div id="charButtons" class="btn-group"></div></div>
+
+    <div class="panel" id="main-display" style="display:none">
+      <div class="profile">
+        <img id="sprite" src="" alt="sprite"/>
+        <div style="flex:1">
+          <h3 id="playerTitle"></h3>
+          <div id="turnInfo" class="small-muted"></div>
+          <div id="rpInfo" class="small-muted"></div>
+          <div id="treasuryInfo" class="small-muted"></div>
+          <div id="investmentInfo" class="small-muted"></div>
+          <div id="activeSkillButtonContainer" style="margin-top:10px"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div class="panel"><h4>政策・アクション</h4><div id="controls"></div><div id="playerActionQueue" class="small-muted" style="margin-top:8px"></div><div class="mt-2 flex flex-wrap gap-2 items-center">
+      <input id="fiscalSpendInput" class="mini-input" placeholder="支出額" type="number" value="100"/>
+      <button class="btn" onclick="quickFiscalSpend()">財政支出</button>
+      <input id="bondIssueInput" class="mini-input" placeholder="国債発行" type="number" value="100"/>
+      <button class="btn" onclick="quickIssueBonds()">国債発行</button>
+      <input id="investmentInput" class="mini-input" placeholder="投資額" type="number" value="100"/>
+      <button class="btn" onclick="investInMarket()">市場へ投資</button>
+      <button class="btn warn" onclick="divestFromMarket()">市場から売却</button>
+    </div></div>
+    
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="panel"><h4>金融市場</h4><div id="financialMarketPanel"></div></div>
+        <div class="panel"><h4>債券市場</h4><div id="bondMarketPanel"></div></div>
+        <div class="panel"><h4>為替市場</h4><div id="forexMarketPanel"></div></div>
+    </div>
+
+    <div class="panel" style="flex-grow:1;display:flex;flex-direction:column"><h4>詳細ログ</h4><textarea id="logArea" readonly></textarea></div>
+  </div>
+
+  <div class="right-column">
+    <div class="panel"><h4>主要経済指標（自国）</h4><div id="playerIndicatorsPanel" class="panel-grid"></div></div>
+    <div class="panel"><h4>財政リスク分析</h4><div id="riskAnalysisContent" class="panel-grid"></div></div>
+    <div class="panel" id="achievements-panel"><h4>実績</h4><ul></ul></div>
+    <div class="panel"><h4>国家総合力ランキング</h4><div id="ranking" class="text-sm"></div></div>
+    <div class="panel"><h4>資産・負債</h4><div id="debtContent" class="text-sm"></div></div>
+    <div class="panel" id="creditor-panel"><h4>他国への貸付</h4><div id="creditorInfo"></div>
+        <select id="lendingTargetSelect"></select>
+        <input id="lendingAmountInput" class="mini-input" placeholder="貸付額" type="number" />
+        <button class="btn" onclick="lendToNation()">貸付実行</button>
+    </div>
+    <div class="panel"><h4>国際情勢</h4><div id="internationalSituationContent" class="panel-grid"></div></div>
+    <div class="panel"><h4>国家会計 (前期)</h4><div id="nationalAccountsPanel" class="panel-grid text-sm"></div></div>
+    <div class="panel"><h4>銀行セクター</h4><div id="bankingSectorContent" class="panel-grid"></div></div>
+    <div class="panel"><h4>中央銀行</h4><div id="centralBankInfo" class="panel-grid"></div></div>
+    <div class="panel"><h4>研究開発</h4><div id="researchContent"></div></div>
+    <div class="panel"><h4>国家プロジェクト</h4><div id="projectsContent"></div></div>
+    <div class="panel"><h4>イールドカーブ</h4><div id="yieldCurveContainer" style="height:100px"></div><div id="yieldCurveInfo" class="small-muted"></div></div>
+    <div class="panel"><h4>ニュース</h4><div id="newsArea" class="scrollable"></div></div>
+    <div class="panel"><h4>外交関係 & 条約</h4><div id="diplomacyContent" class="text-sm"></div><div id="treatyList" class="text-sm"></div></div>
+    <div id="diffusionPanel" class="panel">
+      <h4>拡散フィールド可視化</h4>
+      <div class="row-controls">
+        <select id="scenarioSelect" class="select" title="シナリオ">
+          <option value="0">Case 1: 無偏・等方拡散</option>
+          <option value="1">Case 2: 中心ドリフト</option>
+          <option value="2">Case 3: 異方拡散</option>
+          <option value="3">Case 4: 内部障害</option>
+        </select>
+        <button id="diffToggle" class="btn">拡散: ON</button>
+        <button id="diffReset" class="btn-ghost">リセット</button>
+      </div>
+      <div id="diffInfo" class="muted small"></div>
+      <canvas id="diffusionCanvas" width="400" height="400"></canvas>
+      <div class="legend small-muted">半径 R=1 の円板内でランダム拡散。外縁は反射、障害円は侵入不可。</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =================== Utilities =================== */
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const rndn=()=>{let u=0,v=0; while(u===0)u=Math.random(); while(v===0)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v)}
+const safeNum=(v,f=0)=>{const x=Number(v); return (isNaN(x)||!isFinite(x))?f:x}
+function nelsonSiegel(t, b0, b1, b2, tau) {
+  if (t === 0) return b0 + b1;
+  const t_tau = t / tau;
+  const exp_t_tau = Math.exp(-t_tau);
+  const term1 = b1 * (1 - exp_t_tau) / t_tau;
+  const term2 = b2 * ((1 - exp_t_tau) / t_tau - exp_t_tau);
+  return b0 + term1 + term2;
+}
+function createSparkline(data, width = 100, height = 40) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    if (!data || data.length < 2) {
+        svg.setAttribute('width', '0');
+        svg.setAttribute('height', '0');
+        return svg;
+    };
+    svg.setAttribute('width', width);
+    svg.setAttribute('height', height);
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svg.style.overflow = 'visible';
+
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    let range = max - min;
+    if (range === 0) range = 1;
+
+    const points = data.map((d, i) => {
+      const x = (i / (data.length - 1)) * width;
+      const y = height - ((d - min) / range) * (height - 2) - 1; 
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    }).join(' ');
+    
+    const lastVal = data[data.length-1];
+    const firstVal = data[0];
+    const strokeColor = lastVal >= firstVal ? 'var(--accent)' : 'var(--danger)';
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${points}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', strokeColor);
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(path);
+    
+    return svg;
+}
+function showNotification(msg,type='info'){const a=document.getElementById('notification-area'); if(!a) return; const n=document.createElement('div'); n.className=`notification ${type}`; n.textContent=msg; a.appendChild(n); setTimeout(()=>n.remove(),5000)}
+let state={}; function addLog(who,msg){ if(!state.log) return; const entry=`[T${state.turn}] ${who}: ${msg}`; state.log.unshift(entry); if(state.log.length>1000) state.log.pop(); const l=document.getElementById('logArea'); if(l) l.value=state.log.join("\n") }
+function renderKeyValuePanel(id,obj){ const el=document.getElementById(id); if(!el) return; el.innerHTML=Object.entries(obj).map(([k,v])=>`<div>${k}:</div><div style="text-align:right;font-weight:600">${v}</div>`).join('') }
+function renderList(id,arr){ const el=document.getElementById(id); if(!el) return; el.innerHTML = arr.map(x=>`<div>${x}</div>`).join('') }
+
+/* =================== Game Config =================== */
+const CONFIG = {
+  MAX_TURNS:500,
+  HESTON: { mu:0.0005, kappa:1.2, theta:0.04, xi:0.3, rho:-0.6 },
+  JUMP: { lambda:0.02, mu:-0.08, sigma:0.06 },
+  HAWKES: { base:0.01, alpha:0.12, beta:0.08 },
+  FISCAL_MULT:0.7, TAYLOR: { phi_pi:1.5, phi_y:0.5, r_star:1.5 },
+  LENDING_RATE: 0.04,
+  CONTAGION_FACTOR: 0.15,
+  VICTORY_GDP: 2000,
+  DEFEAT_DEBT_RATIO: 150,
+  ACHIEVEMENTS: [
+    {id: 'stable_economy', name: '安定経済', condition: (n) => n.stats['インフレ率'] < 3 && n.stats['失業率'] < 4 && n.defaultRisk < 0.01},
+    {id: 'research_master', name: '研究マスター', condition: (n) => Object.values(n.research.levels).reduce((s,l)=>s+l,0) >= 10},
+    {id: 'diplomatic_genius', name: '外交の天才', condition: (n) => Object.values(n.relations).reduce((s,r)=>s+r,0)/Object.keys(n.relations).length >= 80},
+    {id: 'lending_lord', name: '貸付王', condition: (n) => n.creditorHoldings.reduce((s,h)=>s+h.amount,0) > 5000}
+  ],
+  MEASURE_TRANSFORM: 0.1,
+  MONOID_EXPANSION: 0.05,
+  HOMOLOGY_FACTOR: 0.01,
+  INFO_GEOM_METRIC: 0.001
+};
+
+/* =================== Characters =================== */
+const CHARACTERS = [
+  {name:'ココア', img:'https://placehold.co/140x210/f8d7da/c82333?text=Cocoa', passive:(n)=>n.bonuses.fiscal_multiplier_bonus=0.1, active:{name:'みんなに元気を！', cooldown:25, effect:(n)=>{ n.stats['失業率']=Math.max(1,n.stats['失業率']-0.5); n.financialStressIndex=Math.max(0,n.financialStressIndex-2); addLog(n.name,'アクティブ技能発動'); } }},
+  {name:'チノ', img:'https://placehold.co/140x210/d1ecf1/0c5460?text=Chino', passive:(n)=>{n.bonuses.tax_cut_bonus=0.1; n.bonuses.investment_return_bonus=0.002}, active:{name:'合理化', cooldown:20, effect:(n)=>{ n.kalman.x+=5; n.stats['インフレ率']=Math.max(-5,n.stats['インフレ率']-0.1); addLog(n.name,'アクティブ技能発動'); } }},
+  {name:'リゼ', img:'https://placehold.co/140x210/d8bfd8/4b0082?text=Rize', passive:(n)=>n.bonuses.military_power_bonus=0.1, active:{name:'規律', cooldown:30, effect:(n)=>{ n.bonuses.debt_risk_suppression={turns:5,factor:0.3}; addLog(n.name,'アクティブ技能発動'); } }},
+  {name:'千夜', img:'https://placehold.co/140x210/90ee90/2e8b57?text=Chiya', passive:(n)=>n.bonuses.cb_credibility_bonus=0.05, active:{name:'おもてなし', cooldown:20, effect:(n)=>{ Object.keys(n.relations).forEach(k=>n.relations[k]=Math.min(100,n.relations[k]+5)); addLog(n.name,'アクティブ技能発動'); } }},
+  {name:'シャロ', img:'https://placehold.co/140x210/fffacd/b8860b?text=Syaro', passive:(n)=>n.bonuses.debt_interest_reduction=0.001, active:{name:'節約術', cooldown:15, effect:(n)=>{ n.bonuses.fiscal_cost_reduction={turns:1,factor:0.3,one_time:true}; addLog(n.name,'アクティブ技能発動'); } }},
+  {name:'青山ブルーマウンテン', img:'https://placehold.co/140x210/add8e6/00008b?text=Aoyama', passive:(n)=>n.bonuses.rp_gain_bonus=0.2, active:{name:'物語の力', cooldown:25, effect:(n)=>{ n.researchPoints += 20; addLog(n.name,'アクティブ技能発動'); } }},
+  {name:'モカ', img:'https://placehold.co/140x210/d2b48c/8b4513?text=Mocha', passive:(n)=>n.bonuses.pc_gain_bonus=0.1, active:{name:'お姉ちゃんに任せなさい！', cooldown:25, effect:(n)=>{ n.publicDiscontent = Math.max(0, n.publicDiscontent - 10); n.financialStressIndex = Math.max(0, n.financialStressIndex - 3); addLog(n.name,'アクティブ技能発動'); } }}
+];
+
+/* =================== Actions =================== */
+const ACTIONS = {
+  '法人税減税':{type:'fiscal',effect:(n)=>applyTaxCut(n,'corporate'),cooldown:10},
+  '所得税減税':{type:'fiscal',effect:(n)=>applyTaxCut(n,'income'),cooldown:10},
+  '消費税増税':{type:'fiscal',effect:(n)=>applyTaxIncrease(n,'consumption'),cooldown:10},
+  '社会資本投資':{type:'fiscal',effect:(n,amt)=>applyFiscal(n.name,amt),cooldown:3},
+  '研究開発投資':{type:'fiscal',effect:(n,amt)=>applyRDInvestment(n,amt),cooldown:10},
+  '環境投資':{type:'fiscal',effect:(n,amt)=>applyGreenInvestment(n, amt),cooldown:10},
+  '量的緩和':{type:'cb',effect:(n)=>setQETarget(n),cooldown:10},
+  '量的引き締め':{type:'cb',effect:(n)=>setQTTarget(n),cooldown:10},
+  'フォワードガイダンス':{type:'cb',effect:(n)=>applyForwardGuidance(n),cooldown:15},
+  '国債発行':{type:'fiscal',effect:(n,amt)=>issueBonds(n,amt),cooldown:2},
+  '規制緩和':{type:'other',effect:(n)=>applyDeregulation(n),cooldown:20},
+  '市場投資':{type:'market',effect:(n,amt)=>applyMarketInvestment(n,amt),cooldown:1},
+  '市場売却':{type:'market',effect:(n,amt)=>applyMarketDivestment(n,amt),cooldown:1}
+};
+
+/* =================== Initialization =================== */
+function makeNations(){
+  const base = { GDP:1200, 'インフレ率':2.0, '失業率':5.0, '技術力':100, '軍事力':50 };
+  const nations = {};
+  CHARACTERS.forEach(c=>{
+    nations[c.name] = {
+      name:c.name, img:c.img,
+      stats: {...base},
+      treasury:12000, researchPoints:20, debt:[], bonuses:{},
+      policy: { taxRate: 0.2 },
+      centralBank:{policyRate:2.0,independence:60,credibility:0.7,balanceSheet:0,reserveRequirement:0.1, qeTarget:0},
+      investments:0, bondYield:0.03, exchangeRate:100, capitalStock:4800, politicalCapital:50,
+      financialStressIndex:5, expectedInflation:CONFIG.HESTON.theta, publicDiscontent:0,
+      defaultRisk:0.01, relations:{}, policyCooldowns:{}, activeSkillCooldown:0,
+      kalman:{x:1200,P:1}, research:{levels:{quantitative_analytics:1,systemic_risk:1,financial_engineering:1}},
+      banking:{capital:1000,npl:50}, nationalAccounts:{revenue:0,spending:0,interestPaid:0,interestReceived:0,socialSecurity:0,tradeBalance:0},
+      nationalProject:{current:null,progress:0}, strategyPropensity:0.5, 
+      yieldCurve: { beta0: 0.03, beta1: -0.01, beta2: 0.005, tau: 1.5 },
+      prevGDP: 1200,
+      foreignReserves:5000,
+      creditorHoldings: [],
+      achievements: [],
+      bondYieldHistory: [],
+      exchangeRateHistory: []
+    }
+  });
+  const names = Object.keys(nations);
+  names.forEach(a=>{ names.forEach(b=>{ if(a!==b) nations[a].relations[b]=50 }) });
+  return nations;
+}
+
+/* =================== RENDER / UI 共通 =================== */
+function renderCharSelect(){
+  const el=document.getElementById('charButtons'); el.innerHTML='';
+  Object.keys(state.nations).forEach(name=>{ const b=document.createElement('button'); b.className='btn'; b.textContent=name; b.onclick=()=>startGame(name); el.appendChild(b); });
+}
+function renderGlobalUI(){
+  const tsel = document.getElementById('treatyList'); tsel.innerHTML='なし';
+}
+
+/* =================== GLOBAL STATE =================== */
+function initializeWorld(){
+  state = {
+    turn:0, maxTurns:CONFIG.MAX_TURNS, log:[], nations:makeNations(), player:null,
+    financialMarket:{S:100, v:CONFIG.HESTON.theta, history:[], lastChange:0}, hawkesIntensity:CONFIG.HAWKES.base,
+    treaties:[], news:[], playerQueue:[], systemic:{defaultsThisTurn:[]},
+    gameOver: false
+  };
+  addLog('SYSTEM','世界が初期化されました（経済モデル改訂版）');
+  document.getElementById('charSelect').style.display = 'block';
+  document.getElementById('victory-screen').style.display = 'none';
+  document.getElementById('defeat-screen').style.display = 'none';
+  renderCharSelect();
+  renderGlobalUI();
+}
+
+/* =================== START / TURN =================== */
+function startGame(name){
+  state.player = name; state.turn = 1; state.gameOver = false;
+  document.getElementById('charSelect').style.display = 'none';
+  Object.values(state.nations).forEach(n => {
+    n.nationalAccounts = {revenue:0,spending:0,interestPaid:0,interestReceived:0,socialSecurity:0,tradeBalance:0};
+    n.bondYieldHistory = [];
+    n.exchangeRateHistory = [];
+  });
+  state.financialMarket.history = [];
+  document.getElementById('main-display').style.display='block'; addLog('PLAYER', `${name} を選択して開始`); renderAll();
+}
+
+function endTurn(){
+  if(!state.player || state.gameOver) return;
+  
+  Object.values(state.nations).forEach(n => {
+    n.nationalAccounts = {revenue:0,spending:0,interestPaid:0,interestReceived:0,socialSecurity:0,tradeBalance:0};
+  });
+
+  applyActionQueue();
+  stepMarket();
+  updateInvestmentReturns();
+  updateYieldCurve();
+  updateBondYields();
+  updateForex();
+  hawkesStep();
+  updateDebtDynamicsAndInterest();
+  aiActions();
+  tickCooldownsAndSpending();
+  updatePotentialGDP();
+  updateRevenue();
+  
+  state.turn++;
+  addLog('SYSTEM', `ターン ${state.turn} 開始`);
+  renderAll();
+  checkVictoryDefeat();
+}
+
+function checkVictoryDefeat() {
+    const p = state.nations[state.player];
+    const debtRatio = (p.debt.reduce((s,d) => s + d.amount, 0) / Math.max(1, p.stats.GDP)) * 100;
+
+    if (p.stats.GDP >= CONFIG.VICTORY_GDP) {
+        state.gameOver = true;
+        document.getElementById('victory-reason').textContent = `GDPが ${CONFIG.VICTORY_GDP} に到達しました！`;
+        document.getElementById('victory-screen').style.display = 'flex';
+    } else if (debtRatio >= CONFIG.DEFEAT_DEBT_RATIO) {
+        state.gameOver = true;
+        document.getElementById('defeat-reason').textContent = `債務GDP比が ${CONFIG.DEFEAT_DEBT_RATIO}% を超えました...`;
+        document.getElementById('defeat-screen').style.display = 'flex';
+    } else if (state.turn >= state.maxTurns) {
+        state.gameOver = true;
+        document.getElementById('defeat-reason').textContent = `最大ターン数 ${state.maxTurns} に到達しました。`;
+        document.getElementById('defeat-screen').style.display = 'flex';
+    }
+}
+
+function restartGame() {
+    initializeWorld();
+}
+
+/* =================== ACTION QUEUE =================== */
+function handleActionClick(actionName,param=null){
+  const p=state.nations[state.player]; const def = ACTIONS[actionName]; if(!def) return;
+  if((p.policyCooldowns[actionName]||0)>0){ showNotification(`${actionName} はクールダウン中`,'warning'); return; }
+  let finalParam = param;
+  if(['fiscal', 'market'].includes(def.type) && finalParam===null){
+    const input = prompt(`${actionName} の金額を入力してください`, '100');
+    if(input===null) return; finalParam = safeNum(input,100);
+  }
+  state.playerQueue.push({action:actionName,param:finalParam});
+  renderPlayerQueue();
+}
+function applyAction(nationName,actionName,param){
+  const n = state.nations[nationName]; const def = ACTIONS[actionName]; if(!n||!def) return;
+  const infoCost = 0.5;
+  if(n.researchPoints < infoCost){ addLog(n.name, 'RP不足でアクション失敗'); return; }
+  n.researchPoints -= infoCost;
+  addLog(n.name, `アクション: ${actionName}${param?` (${Math.round(param)})`:''}`);
+  def.effect(n,param);
+  if(def.cooldown) n.policyCooldowns[actionName]=def.cooldown;
+}
+function applyActionQueue(){ state.playerQueue.forEach(a=>applyAction(state.player,a.action,a.param)); state.playerQueue=[]; renderPlayerQueue(); }
+function renderPlayerQueue(){ const el=document.getElementById('playerActionQueue'); el.innerText = `行動キュー: ${state.playerQueue.map(a=>`${a.action}(${a.param||''})`).join(' / ') || 'なし'}` }
+
+/* =================== 市場モデル：Heston + ジャンプ（離散化） =================== */
+function stepMarket(){
+  const m = state.financialMarket;
+  const dt = 1/252;
+  const {mu,kappa,theta,xi,rho} = CONFIG.HESTON;
+  const v = Math.max(1e-8, m.v + kappa*(theta - m.v)*dt + xi*Math.sqrt(Math.max(m.v,0))*rndn()*Math.sqrt(dt));
+  const z1 = rndn();
+  const z2 = rho*z1 + Math.sqrt(1-rho*rho)*rndn();
+  const S_old = m.S;
+  const dS = m.S * (mu*dt + Math.sqrt(Math.max(v,0))*z1*Math.sqrt(dt));
+  m.S = Math.max(1, m.S + dS);
+  m.v = v;
+  m.lastChange = (m.S - S_old)/S_old;
+  m.history.push(m.S);
+  if (m.history.length > 50) m.history.shift();
+  if(Math.random() < CONFIG.JUMP.lambda){
+    const jumpFrac = CONFIG.JUMP.mu + CONFIG.JUMP.sigma * rndn();
+    const jumpAmount = Math.max(-0.9, m.S * jumpFrac);
+    m.S = Math.max(1, m.S + jumpAmount);
+    state.hawkesIntensity += CONFIG.HAWKES.alpha;
+    addLog('市場','ジャンプ（ショック）発生');
+  }
+}
+
+/* =================== 投資リターン更新 =================== */
+function updateInvestmentReturns() {
+    Object.values(state.nations).forEach(n => {
+        if (n.investments > 0) {
+            const marketReturn = state.financialMarket.lastChange;
+            const bonus = n.bonuses.investment_return_bonus || 0;
+            const totalReturnRate = marketReturn + bonus + (rndn() * 0.005);
+            const gains = n.investments * totalReturnRate;
+            n.investments += gains;
+            
+            if (Math.abs(gains) > 1) {
+                addLog(n.name, `市場投資リターン: ${gains.toFixed(0)} (変化率 ${(totalReturnRate*100).toFixed(2)}%)`);
+            }
+        }
+    });
+}
+
+
+/* =================== ハークス過程風イベント発生 =================== */
+function hawkesStep(){
+  state.hawkesIntensity = Math.max(CONFIG.HAWKES.base, state.hawkesIntensity * Math.exp(-CONFIG.HAWKES.beta) );
+  if(Math.random() < state.hawkesIntensity){
+    const ev = pickEvent();
+    applyEvent(ev);
+    state.hawkesIntensity += CONFIG.HAWKES.alpha;
+  }
+}
+const EVENTS = [
+  {id:'breakthrough',name:'技術的ブレークスルー',effect:(n)=>{ n.researchPoints += 30; addLog('イベント', `${n.name} に技術ブレークスルー`) }},
+  {id:'resource_shock',name:'資源価格ショック',effect:(n)=>{ Object.values(state.nations).forEach(nn=>{ nn.stats['インフレ率'] += 0.5; nn.financialStressIndex += 2 }); addLog('イベント','資源価格ショック（世界）') }},
+  {id:'supply_chain_disruption',name:'サプライチェーン混乱',effect:(n)=>{ Object.values(state.nations).forEach(nn=>{ nn.stats['インフレ率'] += 0.8; nn.stats.GDP -= 15; }); addLog('イベント','世界的なサプライチェーンの混乱が発生') }},
+  {id:'financial_crisis',name:'金融危機',effect:(n)=>{ Object.values(state.nations).forEach(nn=>{ nn.financialStressIndex += 15; nn.defaultRisk += 0.02; state.financialMarket.S *= 0.85; }); addLog('イベント','局所的な金融危機が波及') }},
+  {id:'geopolitics',name:'地政学的リスク',effect:(n)=>{ Object.values(state.nations).forEach(nn=> nn.financialStressIndex += 3); addLog('イベント','地政学的緊張高まる') }},
+  {id:'calm',name:'穏やかな気候',effect:(n)=>{ addLog('イベント','穏やかな日々') }}
+];
+function pickEvent(){ return EVENTS[Math.floor(Math.random()*EVENTS.length)]; }
+function applyEvent(ev){
+  const nations = Object.values(state.nations);
+  const target = nations[Math.floor(Math.random()*nations.length)];
+  ev.effect(target);
+  state.news.unshift(`[T${state.turn}] ${ev.name} 発生`);
+  if(state.news.length>60) state.news.pop();
+}
+
+/* =================== 債務動学 & 利払い & 伝播モデル =================== */
+function updateDebtDynamicsAndInterest(){
+  state.systemic.defaultsThisTurn = [];
+  Object.values(state.nations).forEach(n=>{
+    // 他国からの借金の利払い
+    const interestPayment = n.debt.reduce((s,d)=>s + d.amount * d.interestRate, 0);
+    if (interestPayment > 0) {
+      n.treasury -= interestPayment;
+      n.nationalAccounts.interestPaid += interestPayment;
+    }
+    
+    // 他国への貸付からの利子収入
+    const interestIncome = n.creditorHoldings.reduce((s,h) => s + h.amount * h.interestRate, 0);
+    if (interestIncome > 0) {
+        n.treasury += interestIncome;
+        n.nationalAccounts.interestReceived += interestIncome;
+    }
+
+    // デフォルト判定
+    const totalDebt = n.debt.reduce((s,d)=>s+d.amount,0);
+    const debtRatio = totalDebt / Math.max(1, n.stats.GDP);
+    const baseProb = 0.0001 + Math.pow(Math.max(0, debtRatio - 1.2), 2) * 0.002 + n.financialStressIndex*0.0005;
+    n.defaultRisk = clamp(baseProb, 0, 1);
+
+    if(n.treasury < 0 || Math.random() < n.defaultRisk){
+      n.defaulted = true;
+      state.systemic.defaultsThisTurn.push(n.name);
+      addLog('破綻', `${n.name} がデフォルトしました！`);
+      
+      // 債権者への影響（伝播）
+      Object.values(state.nations).forEach(creditor => {
+          creditor.creditorHoldings.forEach(holding => {
+              if (holding.debtor === n.name) {
+                  const loss = holding.amount * 0.7; // 70%損失
+                  holding.amount *= 0.3;
+                  creditor.financialStressIndex += loss * CONFIG.CONTAGION_FACTOR / 100;
+                  addLog(creditor.name, `${n.name}のデフォルトにより ${Math.round(loss)} の損失`);
+              }
+          });
+          creditor.creditorHoldings = creditor.creditorHoldings.filter(h => h.amount > 1);
+      });
+      
+      n.debt = []; // デフォルトで債務再編
+      n.treasury = Math.max(n.treasury, 10);
+    }
+  });
+}
+
+
+/* =================== イールドカーブ更新 (Nelson-Siegel) =================== */
+function updateYieldCurve() {
+  Object.values(state.nations).forEach(n => {
+    const yc = n.yieldCurve;
+    const gdpGrowth = n.prevGDP > 0 ? (n.stats.GDP - n.prevGDP) / n.prevGDP : 0;
+    n.prevGDP = n.stats.GDP;
+    const target_b0 = (n.centralBank.policyRate / 100) + 0.01; 
+    const inflationGap = n.stats['インフレ率'] - 2.0;
+    const target_b1 = - (gdpGrowth * 0.2) - (inflationGap / 100 * 0.1);
+    yc.beta0 += 0.1 * (target_b0 - yc.beta0) + (rndn() * 0.0001);
+    yc.beta1 += 0.1 * (target_b1 - yc.beta1) + (rndn() * 0.0002);
+    yc.beta2 -= 0.05 * yc.beta2 + (rndn() * 0.0005);
+    yc.beta0 = clamp(yc.beta0, -0.01, 0.1);
+    yc.beta1 = clamp(yc.beta1, -0.05, 0.05);
+    yc.beta2 = clamp(yc.beta2, -0.05, 0.05);
+  });
+}
+
+/* =================== 債券利回り更新 =================== */
+function updateBondYields(){
+  Object.values(state.nations).forEach(n=>{
+    const { beta0, beta1, beta2, tau } = n.yieldCurve;
+    const baseYield10Y = nelsonSiegel(10, beta0, beta1, beta2, tau);
+    n.bondYield = clamp(baseYield10Y + n.defaultRisk * 0.5, 0.001, 0.25);
+    n.bondYieldHistory.push(n.bondYield);
+    if (n.bondYieldHistory.length > 50) n.bondYieldHistory.shift();
+  });
+}
+
+/* =================== 為替更新（簡易） =================== */
+function updateForex(){
+  Object.values(state.nations).forEach(n=>{
+    const shock = 1 + (rndn()*0.01);
+    n.exchangeRate = Math.max(1, n.exchangeRate * shock * (1 + (n.bondYield - 0.02)*0.2));
+    n.exchangeRateHistory.push(n.exchangeRate);
+    if (n.exchangeRateHistory.length > 50) n.exchangeRateHistory.shift();
+  });
+}
+
+/* =================== 債券発行 / 債務関連 =================== */
+function issueBonds(n,amount){
+  amount = safeNum(amount,0);
+  if(amount<=0) return;
+  n.treasury += amount;
+  n.debt.push({ creditor:'market', amount:amount, interestRate:n.bondYield, issueTurn:state.turn });
+  addLog(n.name, `国債発行 ${Math.round(amount)}`);
+}
+function applyFiscal(nationName, amount=100){
+  const n = state.nations[nationName];
+  if(!spendTreasury(n, amount)) return;
+  const eff = CONFIG.FISCAL_MULT * (1 + (n.bonuses.fiscal_multiplier_bonus||0));
+  const gdpBoost = (amount/Math.max(1,n.kalman?.x || n.stats.GDP || 1200)) * eff * 100;
+  n.stats.GDP += gdpBoost;
+  addLog(n.name, `財政支出 ${Math.round(amount)} → GDP +${gdpBoost.toFixed(1)}`);
+}
+function spendTreasury(n,amt){ amt = safeNum(amt,0); if(amt<=0) return true; if(n.treasury>=amt){ n.treasury -= amt; n.nationalAccounts.spending += amt; return true } addLog(n.name, '資金不足で支出失敗'); n.financialStressIndex = Math.min(100, n.financialStressIndex + 5); return false }
+
+/* =================== 税制アクション =================== */
+function applyTaxCut(n, type){
+  n.policy.taxRate = Math.max(0.05, n.policy.taxRate - 0.02);
+  n.stats['失業率'] = Math.max(0, n.stats['失業率'] - 0.2);
+  addLog(n.name, `${type}税減税: 新税率 ${(n.policy.taxRate * 100).toFixed(1)}%`);
+}
+function applyTaxIncrease(n, type){
+  n.policy.taxRate = Math.min(0.5, n.policy.taxRate + 0.02);
+  n.publicDiscontent = Math.min(100, n.publicDiscontent + 2);
+  addLog(n.name, `${type}税増税: 新税率 ${(n.policy.taxRate * 100).toFixed(1)}%`);
+}
+
+/* =================== 追加アクション効果 =================== */
+function applyDeregulation(n) {
+  n.stats.GDP += 20;
+  n.financialStressIndex = Math.min(100, n.financialStressIndex + 3);
+  n.publicDiscontent = Math.min(100, n.publicDiscontent + 1);
+  addLog(n.name, '規制緩和を実施し、経済活動を刺激');
+}
+function applyGreenInvestment(n, amt) {
+  if (!spendTreasury(n, amt)) return;
+  Object.keys(n.relations).forEach(k => n.relations[k] = Math.min(100, n.relations[k] + 2));
+  n.publicDiscontent = Math.max(0, n.publicDiscontent - 2);
+  n.stats.GDP += amt * 0.1;
+  addLog(n.name, `環境投資 ${Math.round(amt)} を実施`);
+}
+function applyForwardGuidance(n) {
+  n.centralBank.credibility = Math.min(1, n.centralBank.credibility + 0.05);
+  n.expectedInflation = n.stats['インフレ率'] * 0.8 + 2.0 * 0.2;
+  addLog(n.name, '中央銀行がフォワードガイダンスを発表');
+}
+function applyMarketInvestment(n, amt) {
+    amt = safeNum(amt, 0);
+    if (amt <= 0) { return; }
+    if (!spendTreasury(n, amt)) return;
+    n.investments += amt;
+    addLog(n.name, `市場へ ${Math.round(amt)} 投資しました`);
+}
+function applyMarketDivestment(n, amt) {
+    amt = safeNum(amt, 0);
+    if (amt <= 0) { return; }
+    const sold = Math.min(n.investments, amt);
+    if (sold <= 0) { return; }
+    n.investments -= sold;
+    n.treasury += sold * 0.98;
+    addLog(n.name, `市場から ${Math.round(sold)} 売却しました`);
+}
+
+/* =================== RD投資 =================== */
+function applyRDInvestment(n, amt){
+  if(!spendTreasury(n, amt)) return;
+  const rpGain = amt * 0.02 + (n.bonuses.rp_gain_bonus || 0) * amt;
+  n.researchPoints += rpGain;
+  addLog(n.name, `RD投資 ${Math.round(amt)} → RP +${rpGain.toFixed(1)}`);
+}
+
+/* =================== 修正: 中央銀行ステップ (超抽象数学的拡張) =================== */
+function centralBankStep(n){
+  const potential = n.kalman?.x || n.stats.GDP;
+  const outputGap = (n.stats.GDP - potential)/Math.max(1,potential);
+  const inflationGap = n.stats['インフレ率'] - 2.0;
+  const target = CONFIG.TAYLOR.r_star + CONFIG.TAYLOR.phi_pi * inflationGap + CONFIG.TAYLOR.phi_y * outputGap;
+  const current = n.centralBank.policyRate;
+  let newRate = current + 0.3*(target - current);
+  n.centralBank.policyRate = clamp(newRate, -1, 20);
+  
+  // 1. 測度論的基盤 - フィルトレーションシミュレーション (確率調整)
+  const filteredOutputGap = outputGap + rndn() * 0.01;
+  const filteredInflationGap = inflationGap + rndn() * 0.005;
+
+  // 2. 金利操作 = 作用素 - 割引作用素介入
+  const discountOperator = Math.exp(-n.centralBank.policyRate / 100);
+  n.centralBank.balanceSheet *= discountOperator;
+
+  // 3. 流動性供給 = 測度変換 - Radon-Nikodym近似
+  const L_t = Math.exp(CONFIG.MEASURE_TRANSFORM * n.financialStressIndex / 100);
+  let credibilityChange = (L_t > 1) ? (L_t - 1) * 0.1 : -(1 - L_t) * 0.1;
+  n.centralBank.credibility += credibilityChange;
+  n.centralBank.credibility = clamp(n.centralBank.credibility, 0, 1);
+
+  // 4. 貨幣供給 = モノイド圏的拡張 - ベースマネー拡張
+  const baseMoneyExpansion = n.centralBank.balanceSheet * CONFIG.MONOID_EXPANSION;
+  n.centralBank.balanceSheet += baseMoneyExpansion;
+
+  // 5. 金融安定化 = ホモロジー理論 - 非自明債務サイクル減少
+  const totalDebt = n.debt.reduce((s,d)=>s+d.amount,0);
+  const homologyAdjustment = CONFIG.HOMOLOGY_FACTOR * totalDebt * n.defaultRisk;
+  n.defaultRisk = Math.max(0, n.defaultRisk - homologyAdjustment);
+
+  // 6. 期待形成 = 情報幾何 - Fisher計量近似調整
+  const fisherMetric = (filteredInflationGap ** 2) * CONFIG.INFO_GEOM_METRIC;
+  n.stats['インフレ率'] += fisherMetric * rndn();
+
+  // 7. コホモロジー的整合性 - 裁定矛盾吸収
+  if (n.financialStressIndex > 20) {
+    n.centralBank.policyRate += rndn() * 0.1;
+    n.centralBank.policyRate = clamp(n.centralBank.policyRate, -1, 20);
+  }
+  
+  addLog(n.name, '中央銀行更新 (抽象数学適用)');
+}
+
+/* =================== 量的緩和/引き締め =================== */
+function setQETarget(n){
+  n.centralBank.qeTarget = Math.min(10000, (n.centralBank.qeTarget || 0) + 500);
+  n.centralBank.balanceSheet += 500;
+  n.stats['インフレ率'] = Math.min(10, n.stats['インフレ率'] + 0.2);
+  addLog(n.name, '量的緩和開始/拡大');
+}
+function setQTTarget(n){
+  const reduction = Math.min(n.centralBank.balanceSheet, 300);
+  n.centralBank.balanceSheet -= reduction;
+  n.centralBank.qeTarget = Math.max(0, (n.centralBank.qeTarget || 0) - 300);
+  n.stats['インフレ率'] = Math.max(-5, n.stats['インフレ率'] - 0.1);
+  addLog(n.name, '量的引き締め開始/拡大');
+}
+
+/* =================== AI 行動（思考ルーチン強化） =================== */
+function aiActions(){
+  Object.values(state.nations).forEach(n=>{
+    if(n.name === state.player) return;
+    const potential = n.kalman?.x || n.stats.GDP;
+    const outputGap = (n.stats.GDP - potential)/Math.max(1,potential);
+    const inflationGap = n.stats['インフレ率'] - 2.0;
+    centralBankStep(n);
+    if(inflationGap > 1.5 && Math.random() < 0.3 && (n.policyCooldowns['量的引き締め'] || 0) === 0){
+        setQTTarget(n);
+        n.policyCooldowns['量的引き締め'] = ACTIONS['量的引き締め'].cooldown;
+    } else if (outputGap < -0.02 && Math.random() < 0.4 && (n.policyCooldowns['量的緩和'] || 0) === 0){
+        setQETarget(n);
+        n.policyCooldowns['量的緩和'] = ACTIONS['量的緩和'].cooldown;
+    }
+    if(n.financialStressIndex > 30 && Math.random() < 0.6){
+      issueBonds(n, n.stats.GDP * (0.05 + Math.random()*0.1) );
+    } else if(outputGap < -0.03 && Math.random() < 0.7){
+      const spendAmount = n.stats.GDP * (0.01 + Math.random()*0.02);
+      applyFiscal(n.name, spendAmount);
+    }
+  });
+}
+
+/* =================== 冷却、基礎支出、プロジェクト進行 =================== */
+function tickCooldownsAndSpending(){
+  Object.values(state.nations).forEach(n=>{
+    const baseSpending = n.stats.GDP * 0.05; 
+    n.treasury -= baseSpending;
+    n.nationalAccounts.spending += baseSpending;
+    Object.entries(n.policyCooldowns).forEach(([k,v])=>{ if(v>0) n.policyCooldowns[k] = v-1; });
+    if(n.activeSkillCooldown>0) n.activeSkillCooldown--;
+    if(n.nationalProject.current){
+      const proj = NATIONAL_PROJECTS[n.nationalProject.current];
+      n.nationalProject.progress++;
+      if(n.nationalProject.progress >= proj.duration){ proj.effect(n); addLog(n.name, `${proj.name} 完成`); n.nationalProject.current=null; n.nationalProject.progress=0; }
+    }
+    CONFIG.ACHIEVEMENTS.forEach(ach => {
+        if (!n.achievements.includes(ach.id) && ach.condition(n)) {
+            n.achievements.push(ach.id);
+            if (n.name === state.player) {
+                showNotification(`実績解除: ${ach.name}`);
+            }
+        }
+    });
+  });
+}
+
+function updatePotentialGDP() {
+    Object.values(state.nations).forEach(n => {
+        const capitalContribution = Math.log(Math.max(1, n.capitalStock / (n.kalman.x * 4))) * 0.005;
+        const techContribution = n.research.levels.quantitative_analytics * 0.0005;
+        const growthRate = 0.001 + capitalContribution + techContribution;
+        n.kalman.x *= (1 + growthRate);
+
+        if (n.investments > 0) {
+            const capitalFormation = n.investments * 0.01;
+            n.capitalStock += capitalFormation;
+        }
+    });
+}
+function updateRevenue() {
+    Object.values(state.nations).forEach(n => {
+        const taxRevenue = n.stats.GDP * n.policy.taxRate;
+        n.treasury += taxRevenue;
+        n.nationalAccounts.revenue += taxRevenue;
+    });
+}
+
+
+/* =================== 研究・プロジェクト定義 =================== */
+const RESEARCH = {
+  quantitative_analytics:{name:'計量分析',base:20},
+  systemic_risk:{name:'システムリスク',base:30},
+  financial_engineering:{name:'金融工学',base:25}
+};
+const NATIONAL_PROJECTS = {
+  particle_accelerator:{name:'粒子加速器',cost:10000,duration:30,effect:(n)=>{ n.bonuses.rp_gain_bonus=(n.bonuses.rp_gain_bonus||0)+0.5 }},
+  space_station:{name:'宇宙計画',cost:15000,duration:40,effect:(n)=>{ n.bonuses.global_prestige=1; Object.keys(n.relations).forEach(k=>n.relations[k]=Math.min(100,n.relations[k]+10)) }}
+};
+function investInResearch(field){
+  const p=state.nations[state.player]; const f=RESEARCH[field]; if(!f) return;
+  const cost = Math.round(f.base * Math.pow(1.5, p.research.levels[field]||1));
+  if(p.researchPoints < cost){ showNotification('RP不足','warning'); return; }
+  p.researchPoints -= cost; p.research.levels[field] = (p.research.levels[field]||1) + 1;
+  addLog(p.name, `${f.name} を投資: Lv${p.research.levels[field]}`);
+  renderResearchPanel();
+}
+function startNationalProject(id){
+  const p=state.nations[state.player]; const proj=NATIONAL_PROJECTS[id];
+  if(!proj) return; if(p.treasury < proj.cost){ showNotification('資金不足','warning'); return; }
+  spendTreasury(p,proj.cost); p.nationalProject.current=id; p.nationalProject.progress=0; addLog(p.name, `${proj.name} を開始`);
+}
+
+/* =================== UIインタラクション =================== */
+function quickFiscalSpend(){ const amt = safeNum(document.getElementById('fiscalSpendInput').value,100); handleActionClick('社会資本投資', amt) }
+function quickIssueBonds(){ const amt = safeNum(document.getElementById('bondIssueInput').value,100); handleActionClick('国債発行', amt); }
+function investInMarket(){ const amt = safeNum(document.getElementById('investmentInput').value,0); handleActionClick('市場投資', amt); }
+function divestFromMarket(){ const amt = safeNum(document.getElementById('investmentInput').value,0); handleActionClick('市場売却', amt); }
+function lendToNation() {
+    const p = state.nations[state.player];
+    const targetName = document.getElementById('lendingTargetSelect').value;
+    const amount = safeNum(document.getElementById('lendingAmountInput').value, 0);
+    if (!targetName || amount <= 0) {
+        showNotification('貸付先と金額を正しく入力してください', 'warning');
+        return;
+    }
+    const target = state.nations[targetName];
+    if (!target) return;
+    if (!spendTreasury(p, amount)) return;
+
+    const interestRate = CONFIG.LENDING_RATE + target.defaultRisk * 2;
+    p.creditorHoldings.push({ debtor: targetName, amount: amount, interestRate: interestRate });
+    target.debt.push({ creditor: p.name, amount: amount, interestRate: interestRate });
+    
+    addLog(p.name, `${targetName}に${amount}を貸付 (金利 ${interestRate.toFixed(3)})`);
+    renderAll();
+}
+
+/* =================== レンダリング =================== */
+function renderAll(){
+  if(!state.player) return;
+  const p = state.nations[state.player];
+  document.getElementById('playerTitle').textContent = `${p.name} 政務官`;
+  document.getElementById('turnInfo').textContent = `ターン: ${state.turn}/${state.maxTurns}`;
+  document.getElementById('rpInfo').textContent = `研究ポイント: ${Math.round(p.researchPoints)}`;
+  document.getElementById('treasuryInfo').textContent = `国庫: ${Math.round(p.treasury)}`;
+  document.getElementById('investmentInfo').textContent = `投資: ${Math.round(p.investments)}`;
+  document.getElementById('sprite').src = p.img || '';
+  createActionButtons();
+  renderPlayerIndicators(); renderRiskAnalysis(); 
+  renderRanking(); renderDiplomacy(); renderPlayerQueue();
+  renderCentralBank(); renderDebtPanel(); renderResearchPanel(); renderProjectsPanel();
+  renderMarkets(); renderYieldCurve(); renderNews();
+  renderNationalAccounts(); renderBankingSector(); renderInternationalSituation();
+  renderAchievements(); renderCreditorPanel();
+}
+function createActionButtons(){
+  const controls = document.getElementById('controls'); controls.innerHTML=''; const p=state.nations[state.player];
+  const cats = {
+    '財政':['法人税減税','所得税減税','消費税増税','社会資本投資','研究開発投資', '環境投資'],
+    '金融':['量的緩和','量的引き締め', 'フォワードガイダンス'],
+    '構造政策':['規制緩和', '国債発行']
+  };
+  Object.entries(cats).forEach(([label,actions])=>{ const wrap=document.createElement('div'); wrap.style.marginBottom='8px'; const t=document.createElement('div'); t.className='small-muted'; t.textContent = label; wrap.appendChild(t); const bg = document.createElement('div'); bg.className='btn-group';
+    actions.forEach(a=>{ const btn=document.createElement('button'); btn.className='btn small'; const cooldown = state.nations[state.player].policyCooldowns[a]||0; btn.textContent = cooldown>0?`${a}(${cooldown})`:a; btn.disabled = cooldown>0; btn.onclick = ()=>handleActionClick(a); bg.appendChild(btn); });
+    wrap.appendChild(bg); controls.appendChild(wrap);
+  });
+  const endBtn=document.createElement('button'); endBtn.className='btn warn mt-2'; endBtn.textContent='ターン終了'; endBtn.onclick = ()=>endTurn(); endBtn.disabled=state.gameOver; controls.appendChild(endBtn);
+}
+function renderPlayerIndicators(){
+  const p=state.nations[state.player];
+  const debt = p.debt.reduce((s,d)=>s+d.amount,0);
+  const data = {
+    'GDP': `${Math.round(p.stats.GDP)} (潜在:${Math.round(p.kalman.x)})`,
+    '債務/GDP比': `${((debt/Math.max(1,p.stats.GDP))*100).toFixed(1)}%`,
+    'インフレ率': `${p.stats['インフレ率'].toFixed(2)}%`,
+    '失業率': `${p.stats['失業率'].toFixed(2)}%`,
+    '政策金利': `${p.centralBank.policyRate.toFixed(2)}%`
+  };
+  renderKeyValuePanel('playerIndicatorsPanel', data);
+}
+function renderRiskAnalysis(){
+  const p=state.nations[state.player];
+  const totalDebt = p.debt.reduce((s,d)=>s+d.amount,0);
+  const b = totalDebt / Math.max(1, p.stats.GDP);
+  const drift = (p.bondYield - 0.02)*b;
+  const meanTime = drift>0.001?`${Math.round(clamp((2-b)/drift,0,999))}ターン`:'安定';
+  renderKeyValuePanel('riskAnalysisContent', {'債務比率トレンド':`${(drift*100).toFixed(2)}%/turn`,'平均破綻到達時間':meanTime,'テールリスク': state.financialMarket.v>0.1?'高':'低'});
+}
+function renderRanking(){
+  const arr=Object.values(state.nations).map(n=>({name:n.name,score:calcScore(n).total})).sort((a,b)=>b.score-a.score);
+  renderList('ranking', arr.map((r,i)=>`${i+1}位 ${r.name}: ${Math.round(r.score)}`));
+}
+function calcScore(n){
+  const eco = (n.stats.GDP||1000)*0.5 + (n.capitalStock||2000)*0.0005;
+  const fin = (1 - (n.defaultRisk||0)) * 70;
+  const mil = n.stats['軍事力']||0;
+  const tech = Object.values(n.research.levels||{}).reduce((s,x)=>s+x,0)*10;
+  const total = eco*0.35 + fin*0.25 + mil*0.15 + tech*0.25;
+  return { total: safeNum(total/15,0) };
+}
+function renderDiplomacy(){
+  const p=state.nations[state.player];
+  const arr = Object.entries(p.relations).map(([k,v])=>`${k}: ${v.toFixed(1)}`);
+  renderList('diplomacyContent', arr);
+  renderList('treatyList', state.treaties.map(t=>`${t.a}⇄${t.b} (${t.type})`));
+}
+function renderCentralBank(){ const p=state.nations[state.player]; renderKeyValuePanel('centralBankInfo', {'政策金利': `${p.centralBank.policyRate.toFixed(2)}%`, '中銀信頼性': p.centralBank.credibility.toFixed(2), 'バランスシート': Math.round(p.centralBank.balanceSheet)}); }
+function renderDebtPanel(){
+    const p=state.nations[state.player];
+    const assets = p.creditorHoldings.length ? p.creditorHoldings.map(b=>`${b.debtor}への債権 +${Math.round(b.amount)}`).join('<br>') : 'なし';
+    const debts = p.debt.length ? p.debt.map(d=>`借入(${d.creditor}) -${Math.round(d.amount)}`).join('<br>') : 'なし';
+    document.getElementById('debtContent').innerHTML = `<div><b>資産（債権）</b><br>${assets}</div><hr class="my-2"><div><b>負債（債務）</b><br>${debts}</div>`;
+}
+function renderResearchPanel(){ const p=state.nations[state.player]; const el=document.getElementById('researchContent'); el.innerHTML=''; Object.entries(RESEARCH).forEach(([id,f])=>{ const level = p.research.levels[id]||1; const cost = Math.round(f.base*Math.pow(1.5,level)); el.innerHTML += `<div class="flex justify-between items-center mb-1"><div><b>${f.name}</b> (Lv.${level})</div><button class="btn small" ${p.researchPoints < cost ? 'disabled' : ''} onclick="investInResearch('${id}')">投資(${cost}RP)</button></div>`; }); }
+function renderProjectsPanel(){ const p=state.nations[state.player]; const el=document.getElementById('projectsContent'); el.innerHTML=''; if(p.nationalProject.current){ const proj=NATIONAL_PROJECTS[p.nationalProject.current]; const prog = Math.round((p.nationalProject.progress/proj.duration)*100); el.innerHTML = `<div><b>${proj.name} (進行中)</b><div class="progress-bar mt-1"><div class="progress-bar-fill" style="width:${prog}%"></div></div></div>` } else { Object.entries(NATIONAL_PROJECTS).forEach(([id,proj])=> el.innerHTML += `<div class="flex justify-between items-center mb-1"><div><b>${proj.name}</b><div class="small-muted">C:${proj.cost} T:${proj.duration}</div></div><button class="btn small" onclick="startNationalProject('${id}')">開始</button></div>`); } }
+function renderMarkets() {
+    const p = state.nations[state.player];
+    const containerStyle = `display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 16px;`;
+    const valueStyle = `font-size: 1.5rem; font-weight: 600; line-height: 1.2; grid-row: 1 / 3;`;
+    const statsStyle = `font-size: 0.8rem; grid-column: 1; grid-row: 3;`;
+    const sparklineStyle = `grid-row: 1 / 4; grid-column: 2; align-self: center;`;
+
+    const fmPanel = document.getElementById('financialMarketPanel');
+    if (fmPanel) {
+        const change = state.financialMarket.lastChange * 100;
+        const changeColor = change >= 0 ? 'var(--accent)' : 'var(--danger)';
+        fmPanel.innerHTML = `<div style="${containerStyle}"><div style="${valueStyle}"><div>${state.financialMarket.S.toFixed(2)}</div><div style="font-size: 0.9rem; color: ${changeColor};">${change.toFixed(2)}%</div></div><div style="${statsStyle}">ボラ: ${state.financialMarket.v.toFixed(4)}</div><div class="sparkline-wrapper" style="${sparklineStyle}"></div></div>`;
+        fmPanel.querySelector('.sparkline-wrapper').appendChild(createSparkline(state.financialMarket.history, 100, 50));
+    }
+    
+    const bmPanel = document.getElementById('bondMarketPanel');
+    if (bmPanel) {
+        bmPanel.innerHTML = `<div style="${containerStyle}"><div style="${valueStyle}"><div>${(p.bondYield*100).toFixed(3)}%</div><div style="font-size: 0.9rem; color: var(--muted);">10年利回り</div></div><div style="${statsStyle}">リスク: ${(p.defaultRisk*100).toFixed(2)}%</div><div class="sparkline-wrapper" style="${sparklineStyle}"></div></div>`;
+        bmPanel.querySelector('.sparkline-wrapper').appendChild(createSparkline(p.bondYieldHistory.map(y => y * 100), 100, 50));
+    }
+
+    const fxPanel = document.getElementById('forexMarketPanel');
+    if (fxPanel) {
+        const lastChange = p.exchangeRateHistory.length > 1 ? p.exchangeRateHistory.slice(-1)[0] - p.exchangeRateHistory.slice(-2)[0] : 0;
+        const changeColor = lastChange >= 0 ? 'var(--accent)' : 'var(--danger)';
+        fxPanel.innerHTML = `<div style="${containerStyle}"><div style="${valueStyle}"><div>${p.exchangeRate.toFixed(2)}</div><div style="font-size: 0.9rem; color: ${changeColor};">${lastChange.toFixed(2)}</div></div><div style="${statsStyle}">外貨準備: ${Math.round(p.foreignReserves||5000)}</div><div class="sparkline-wrapper" style="${sparklineStyle}"></div></div>`;
+        fxPanel.querySelector('.sparkline-wrapper').appendChild(createSparkline(p.exchangeRateHistory, 100, 50));
+    }
+}
+function renderYieldCurve(){
+  const p = state.nations[state.player];
+  const container = document.getElementById('yieldCurveContainer');
+  container.innerHTML = `<svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%"></svg>`;
+  const svg = container.querySelector('svg'); if(!svg) return;
+  const { beta0, beta1, beta2, tau } = p.yieldCurve;
+  const maturities = [0.25, 0.5, 1, 2, 3, 5, 7, 10, 15, 20, 30];
+  const yields = maturities.map(t => nelsonSiegel(t, beta0, beta1, beta2, tau) * 100);
+  const yMin = Math.min(0, ...yields) - 0.5;
+  const yMax = Math.max(3, ...yields) + 0.5;
+  const yRange = yMax - yMin;
+  const xMax = maturities[maturities.length - 1];
+  for(let i=0; i <= 5; i++) {
+    const y = 95 - (i/5) * 90;
+    const val = yMin + (i/5) * yRange;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', 5); line.setAttribute('y1', y); line.setAttribute('x2', 195); line.setAttribute('y2', y); line.setAttribute('stroke', '#e2e8f0'); svg.appendChild(line);
+    const text = document.createElementNS('http://www.w3.org/2000/svg','text');
+    text.setAttribute('x', 8); text.setAttribute('y', y-2); text.setAttribute('font-size', '8px'); text.setAttribute('fill', 'var(--muted)'); text.textContent = val.toFixed(1) + '%'; svg.appendChild(text);
+  }
+  let path = 'M' + maturities.map((t,i) => `${(10+(t/xMax)*185).toFixed(2)} ${(95-((yields[i]-yMin)/yRange)*90).toFixed(2)}`).join(' L ');
+  const pathEl = document.createElementNS('http://www.w3.org/2000/svg','path');
+  pathEl.setAttribute('d',path); pathEl.setAttribute('stroke','var(--accent)'); pathEl.setAttribute('fill','none'); pathEl.setAttribute('stroke-width','1.5'); pathEl.setAttribute('stroke-linejoin','round'); svg.appendChild(pathEl);
+  const spread = (nelsonSiegel(10, beta0, beta1, beta2, tau) - nelsonSiegel(2, beta0, beta1, beta2, tau)) * 100;
+  document.getElementById('yieldCurveInfo').textContent = `長短金利差 (10Y-2Y): ${spread.toFixed(3)}%`;
+}
+function renderNews(){ renderList('newsArea', state.news.slice(0,20)) }
+function renderNationalAccounts(){
+  const p = state.nations[state.player];
+  const data = {'歳入': Math.round(p.nationalAccounts.revenue), '歳出': Math.round(p.nationalAccounts.spending), '利子収支': `${Math.round(p.nationalAccounts.interestReceived - p.nationalAccounts.interestPaid)}`, '貿易収支': Math.round(p.nationalAccounts.tradeBalance)};
+  renderKeyValuePanel('nationalAccountsPanel', data);
+}
+function renderBankingSector(){ const p = state.nations[state.player]; renderKeyValuePanel('bankingSectorContent', { '資本': Math.round(p.banking.capital), '不良債権': Math.round(p.banking.npl) }); }
+function renderInternationalSituation(){ const p = state.nations[state.player]; const avgRel = Object.values(p.relations).length > 0 ? Object.values(p.relations).reduce((s,v)=>s+v,0)/Object.values(p.relations).length : 50; renderKeyValuePanel('internationalSituationContent', {'平均関係': avgRel.toFixed(1), '地政学リスク': state.hawkesIntensity.toFixed(3)}); }
+function renderAchievements() {
+    const p = state.nations[state.player];
+    const el = document.querySelector('#achievements-panel ul');
+    if (!el) return;
+    el.innerHTML = CONFIG.ACHIEVEMENTS.map(ach => `<li class="${p.achievements.includes(ach.id) ? 'unlocked' : ''}">✓ ${ach.name}</li>`).join('');
+}
+function renderCreditorPanel() {
+    const p = state.nations[state.player];
+    const select = document.getElementById('lendingTargetSelect');
+    select.innerHTML = '';
+    Object.keys(state.nations).filter(name => name !== p.name).forEach(name => {
+        const option = document.createElement('option');
+        option.value = name;
+        option.textContent = name;
+        select.appendChild(option);
+    });
+}
+
+/* =================== Init Call =================== */
+initializeWorld();
+</script>
+
+<script>
+// Diffusion Field Visualization Script
+(function(){
+  const R = 1.0;
+  const bins = 200;
+  const burnIn = 5000;
+  const batchPerFrame = 2000;
+
+  const scenarios = [
+    { title:'Case 1: 無偏・等方拡散', sigma:[0.02,0.02], drift:0.0,  obsR:0.0,  obsC:[0.3,0.0] },
+    { title:'Case 2: 中心ドリフト',   sigma:[0.02,0.02], drift:0.05, obsR:0.0,  obsC:[0.3,0.0] },
+    { title:'Case 3: 異方拡散',       sigma:[0.03,0.01], drift:0.0,  obsR:0.0,  obsC:[0.3,0.0] },
+    { title:'Case 4: 内部障害',       sigma:[0.02,0.02], drift:0.0,  obsR:0.25, obsC:[0.4,0.0] },
+  ];
+
+  const cvs = document.getElementById('diffusionCanvas');
+  if(!cvs) return;
+  const ctx = cvs.getContext('2d');
+  const info = document.getElementById('diffInfo');
+  const sel  = document.getElementById('scenarioSelect');
+  const btOn = document.getElementById('diffToggle');
+  const btRe = document.getElementById('diffReset');
+
+  const W = bins, H = bins;
+  const hist = new Float32Array(W*H);
+  const mask = new Uint8Array(W*H);
+  let x = 0, y = 0;
+  let steps = 0;
+  let running = true;
+  let scIdx = 0;
+
+  for(let j=0;j<H;j++){
+    for(let i=0;i<W;i++){
+      const xx = (i+0.5)/W*2 - 1;
+      const yy = (j+0.5)/H*2 - 1;
+      mask[j*W+i] = (xx*xx + yy*yy <= 1)? 1 : 0;
+    }
+  }
+
+  function localRndn(){
+    let u=0,v=0;
+    while(u===0)u=Math.random();
+    while(v===0)v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+
+  function stepOne(){
+    const sc = scenarios[scIdx];
+    let dx = localRndn()*sc.sigma[0] - sc.drift*x;
+    let dy = localRndn()*sc.sigma[1] - sc.drift*y;
+    let nx = x + dx, ny = y + dy;
+
+    const rr = Math.hypot(nx, ny);
+    if(rr > R){
+      const f = R/rr; nx *= f; ny *= f;
+    }
+
+    if(sc.obsR > 0){
+      const d = Math.hypot(nx - sc.obsC[0], ny - sc.obsC[1]);
+      if(d < sc.obsR){ nx = x; ny = y; }
+    }
+    x = nx; y = ny;
+
+    if(steps >= burnIn){
+      const i = Math.floor(((x/R + 1)*0.5) * W);
+      const j = Math.floor(((y/R + 1)*0.5) * H);
+      if(i>=0 && i<W && j>=0 && j<H) hist[j*W+i] += 1;
+    }
+    steps++;
+  }
+
+  function draw(){
+    let maxv = 0;
+    for(let k=0;k<hist.length;k++) if(hist[k]>maxv) maxv = hist[k];
+
+    const img = ctx.createImageData(cvs.width, cvs.height);
+    const sx = Math.floor(cvs.width / W) || 1;
+    const sy = Math.floor(cvs.height / H) || 1;
+
+    for(let j=0;j<H;j++){
+      for(let i=0;i<W;i++){
+        const v = hist[j*W+i];
+        const inside = mask[j*W+i]===1;
+        let r=0,g=0,b=0,a=0;
+        if(inside){
+          const t = maxv>0 ? (v/maxv) : 0;
+          r = (20 + 60*t)|0; g = (90 + 140*t)|0; b = (110 + 140*t)|0; a = 255;
+        }
+        for(let dy=0; dy<sy; dy++){
+          for(let dx=0; dx<sx; dx++){
+            const px = ( (j*sy+dy)*cvs.width + (i*sx+dx) )*4;
+            img.data[px] = r; img.data[px+1] = g; img.data[px+2] = b; img.data[px+3] = a;
+          }
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+
+    ctx.beginPath();
+    const rad = Math.min(cvs.width, cvs.height)/2 - 1;
+    ctx.strokeStyle = 'rgba(15,23,42,0.35)';
+    ctx.lineWidth = 2;
+    ctx.arc(cvs.width/2, cvs.height/2, rad, 0, Math.PI*2);
+    ctx.stroke();
+
+    info.textContent = `シナリオ: ${scenarios[scIdx].title} / steps: ${steps.toLocaleString()}`;
+  }
+
+  function loop(){
+    if(running){
+      for(let k=0; k < batchPerFrame; k++) stepOne();
+      draw();
+    }
+    requestAnimationFrame(loop);
+  }
+  loop();
+
+  sel.addEventListener('change', e=>{
+    scIdx = +e.target.value || 0;
+    hist.fill(0); steps = 0; x = 0; y = 0;
+  });
+  btOn.addEventListener('click', ()=>{
+    running = !running;
+    btOn.textContent = running ? '拡散: ON' : '拡散: OFF';
+  });
+  btRe.addEventListener('click', ()=>{
+    hist.fill(0); steps = 0; x = 0; y = 0;
+  });
+})();
+</script>
+</body>
+</html>
+
